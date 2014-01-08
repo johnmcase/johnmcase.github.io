@@ -1,7 +1,7 @@
 ---
 layout: post
-category : "Centare Blog"
-tagline: "Is this visible"
+category : "Blog"
+tagline: ""
 tags: [Reactive]
 
 ---

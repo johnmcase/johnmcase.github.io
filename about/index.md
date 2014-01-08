@@ -1,7 +1,7 @@
 ---
 layout: page
 title: "About Me"
-tagline: In case you wanted to know
+tagline: "In case you wanted to know"
 description: "About Me"
 ---
 {% include JB/setup %}
