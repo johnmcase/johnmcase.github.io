@@ -7,9 +7,9 @@ tags: [Reactive]
 ---
 {% include JB/setup %}
 
-# Reactive Programming
-
 Software development practices have not always kept up with the environments they are developing software for.  Modern software systems are no longer single monolithic processes that connect to a persistent data store.  Instead the modern system often retrieves and stores data across multiple stores, typically located somewhere over the internet instead of on the local network.  Off location data services like these necessarily come with greater latency than local services.  Somewhat paradoxically, users of modern applications have much less tolerance for slow response times than they did just a few years ago.
+
+<!--excerpt-->
 
 A new set of architectural principles has grown out of this need to manage larger and more disparate data while at the same time making the user experience as snappy and responsive as possible.  These principles are bundled under the heading of reactive programming.  These principles are described in the [Reactive Manifesto](http://www.reactivemanifesto.org)  I will try to distill the reactive programming principles at a high level in this post and then provide more concrete examples in future posts.
 

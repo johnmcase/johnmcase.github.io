@@ -9,13 +9,15 @@ pygments: true
 # so be sure to set them if your theme uses them.
 #
 title : Case Class
-tagline: I like Scala
+tagline: 
 author :
   name : John Case
   email : johnmcase@gmail.com
   github : johnmcase
   twitter : johnmcase
   #feedburner : feedname
+  
+excerpt_separator: <!--excerpt-->
 
 # The production_url is only used when full-domain names are needed
 # such as sitemap.txt 
