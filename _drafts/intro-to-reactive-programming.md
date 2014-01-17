@@ -1,6 +1,6 @@
 ---
 layout: post
-category : "Blog"
+category : "Centare Blog"
 tagline: ""
 tags: [Reactive]
 
