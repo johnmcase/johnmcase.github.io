@@ -7,6 +7,10 @@ tags: [Reactive]
 ---
 {% include JB/setup %}
 
+This is a copy of the a post I did for my company's blog.  You can find the original post [here](http://www.centare.com/intro-to-reactive-programming/).
+
+---
+
 Software development practices have not always kept up with the environments they are developing software for.  Modern software systems are no longer single monolithic processes that connect to a persistent data store.  Instead the modern system often retrieves and stores data across multiple stores, typically located somewhere over the internet instead of on the local network.  Off location data services like these necessarily come with greater latency than local services.  Somewhat paradoxically, users of modern applications have much less tolerance for slow response times than they did just a few years ago.
 
 <!--excerpt-->
