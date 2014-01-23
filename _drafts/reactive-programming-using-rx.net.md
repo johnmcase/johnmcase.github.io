@@ -12,9 +12,17 @@ In my previous post (make link) I talked about the high level principles of reac
 
 <!--excerpt-->
 
+For the sake of an admittedly contrived example, suppose you are working on some kind of application and you are given the following requirements:
+
+>Display a text box for a user to type in a product name.  Once they've typed in a few characters, populate a side bar displaying the full name of every product that starts with the typed in letters.  Then for each product returned look up the top 10 customers for each. The product names must be displayed as soon as they are available, and the customer data must be filled in as it arrives.  The application must remain usable while the data is being populated.
+
+To make things interesting, we're going to presume that the list of products and top 10 customer list all come from their own distinct services.  To add an additional wrinkle, there are actually 3 different product catalogs that we must check, and there is no existing service to provide an aggregate search across all 3.
+
+Most developers will read that and immediately start thinking of asynchronous callbacks.  They are probably thinking this is do-able, but it is going to be ugly.  The power of the Rx extensions is that it allows us to turn this into a very elegant solution.
+
 Rx is based on two very simple interfaces, Observable and Observer:
 
-{% highlight c# linenos %}
+{%highlight csharp%}
 public interface IObservable<out T>
 {
   IDisposable Subscribe(IObserver<T> observer);
@@ -26,12 +34,12 @@ public interface IObserver<in T>
   void OnError(Exception error);
   void OnCompleted();
 }
-{% endhighlight %}
+{%endhighlight%}
 
 
 Seasoned C# developers may notice that these two interfaces should look remarkably similar to the familiar IEnumerable and IEnumerator interfaces:
 
-{% highlight c# linenos %}
+{%highlight csharp%}
 public interface IEnumerable<out T>
 {
   IEnumerator<T> GetEnumerator();
@@ -44,26 +52,68 @@ public interface IEnumerator<out T> : IDisposable
 }
 {% endhighlight %}
 
-These interfaces are the exact opposite of each other.  In fact, IObservable is the <a href="http://en.wikipedia.org/wiki/Duality_(mathematics)">mathematical dual</a> of IEnumerable, and IObserver is the dual of IEnumerator.  There is a [great video](http://channel9.msdn.com/Shows/Going+Deep/Expert-to-Expert-Brian-Beckman-and-Erik-Meijer-Inside-the-NET-Reactive-Framework-Rx) on Microsoft's Channel 9 that explains the duality of these two interfaces at about the 7:00 minute mark.  I highly recommend watching the video for a truly in depth explanation of these interfaces and the mathematical theory behind them.
+These interfaces are the exact opposite of each other.  In fact, IObservable is the <a href="http://en.wikipedia.org/wiki/Duality_(mathematics)">mathematical dual</a> of IEnumerable, and IObserver is the dual of IEnumerator.  There is a [great video](http://channel9.msdn.com/Shows/Going+Deep/Expert-to-Expert-Brian-Beckman-and-Erik-Meijer-Inside-the-NET-Reactive-Framework-Rx) on Microsoft's Channel 9 that explains the duality of these two interfaces at about the 7:00 minute mark.  I highly recommend watching the entire video for a truly in depth explanation of these interfaces and the mathematical theory behind them.
 
 Why should we care if these interfaces are duals?  Well in essences it means that everything you can do with IEnumerable you can also do with IObservable, except inverted.  Let's think about this a little bit:
 
-* With an IEnumerable you get an IEnumerator from it via the GetEnumerator() method.  
-* You ask the IEnumerator whether or not it has any more elements in its collection via the MoveNext() method.  
-* If it returns true, you ask for the element and it gives it to you via the Current() method.  
+<!-- Annoyed that you can't use markdown inside of block level tags -->
+<div class="row">
+<div class="col-md-8">
+<ul>
+<li>With an IEnumerable you get an IEnumerator from it via the GetEnumerator() method.</li>
+<li>You ask the IEnumerator whether or not it has any more elements in its collection via the MoveNext() method, which will return true or false.</li>
+<li>If it returns true, you ask for the element and it gives it to you via the Current() method.</li>
+</ul>
+</div>
 
-All of these methods are synchronous and blocking.  Often times the collection is (wisely) implemented as a lazy collection using *yield returns* and so the caller must wait for the collection to compute its next value, if any.  If the collection is not lazy, then the entire contents of the collection are already sitting in memory, which could cause a problem for very large collections.  Lets look at doing the same thing with the dual IObservable collection:
+<div class="well well-sm col-md-4">Note that often these steps are obscured by using a <code>foreach</code> loop to iterate over the collection, but they are all still executed under the covers.
+</div>
+</div>
 
-* With an IObservable you pass an IObserver to it via the Subscribe() methods.
-    * The IDisposable returned corresponds to the IDisposable that IEnumerator extends.  It can be used as a way to unsubscribe from the observable stream.
-* On the IObserver you define a method, OnComplete(), that will be called when the end of the collection has been met.
-	* This is an optimization of the true dual method.  The true dual would have been to define a method that is called with a true or false parameter indicating whether or not the collection has been completed.  It makes more sense to only call it in the true case and ditch the parameter.
+All of these methods are synchronous and blocking.  Often times the collection is (wisely) implemented as a lazy collection using *yield returns* and so the caller must wait for the collection to compute its next value, if any.  If the collection is not lazy, then the entire contents of the collection are already sitting in memory, which could cause a problem for very large collections.  Lets look at doing the same thing with the IEnumberable's dual, an IObservable collection.  (Note that since everything is inverted, the top bullet point from the list above corresponds to the bottom bullet point in the list below):
+
 * On the IObserver you define 2 methods OnNext() and OnError() that will be called when the next element of the collection is available, or when an error occurs.
 	* The reason the single Current() method of IEnumerator dualized into two methods on IObserver is because Current() could also thrown an exception.
+* On the IObserver you define a method, OnComplete(), that will be called when the end of the collection has been met.
+	* This is an optimization of the true dual method.  The true dual would have been to define a method that is called with a true or false parameter indicating whether or not the collection has been completed.  It makes more sense to only call it in the true case and ditch the parameter.
+* With an IObservable you pass an IObserver to it via the Subscribe() method.
+    * The IDisposable returned corresponds to the IDisposable that IEnumerator extends.  It can be used as a way to unsubscribe from the observable stream.
 
 The behavior of IObservable and IObserver is also the inverse of the behavior of IEnumerable and IEnumerator.  Where as IEnumerable and IEnumerator have only blocking operations, all of the methods on IObservable and IObservable are asynchronous and non-blocking.  Another way to look at the duality between these interfaces is that IEnumerables are *pull* based collections, where as IObservables are *push* based collections.
 
-Right about now you may be rather unimpressed, after all the .Net runtime already comes with a whole host of techniques and libraries to create asynchronous code.  We already have Task&lt;T&gt; and the TPL and even async/await to make dealing with asynchrnous code simple.  But the real power of Rx is that all of the LINQ operators you are familiar with using over IEnumerable collections can also be used over IObservable collections, and furthermore these operators are themselves implemented in a completely asynchronous fashion.  So not only does Rx give us pushed based collections, but it also makes these collections composeable.  Lets dive into some examples and see exactly what this means.
+Right about now you may be rather unimpressed, after all the .Net runtime already comes with a whole host of techniques and libraries to create asynchronous code.  We already have Task&lt;T&gt; and the TPL and even async/await to make dealing with asynchrnous code simpler.  But the real power of Rx is that because IObservable can be viewed as a *collection* of events, all of the LINQ operators you are familiar with using over IEnumerable collections can also be used over IObservable collections.  Furthermore, these operators are themselves implemented in a completely asynchronous fashion.  So not only does Rx give us pushed based collections, but it also makes these collections composeable.  Lets look at our example requirements from above and see what this means:
+
+It is generally a good strategy to break the problem down into individual components, and this is no exception.  To do that, we'll write functions to retrieve each piece of data:
+
+{% highlight c# %}
+public IList<Product> ProductsStartingWith(string startsWith, int catalogId)
+{
+  // Code to synchronously lookup Products from the specified catalog.
+}
+
+public IObservable<Thing> asdfsafd(Product p) {
+  return Observable.Create(observer =>
+    try
+    {
+	  observer.OnNext(/* Lookup thing synchronously.  This may fail */);
+    }
+    catch(Exception e)
+    {
+      observer.OnException(e);
+    }
+    finally
+    {
+      observer.OnComplete();
+    }
+  );
+}
+{% endhighlight %}
+
+blah blah blah
+
+---
+
+#OLD STUFF
 
 ### Examples
 
@@ -78,19 +128,21 @@ Right about now you may be rather unimpressed, after all the .Net runtime alread
 #### Creating Observables
 
 The Rx library is loaded with many different ways to create Observable instances.  Several of them are not that useful for production code, but are great for testing or for examples.  Some of these are:
-* <code>Observable.Return(T)</code>: Creates a sequence with a single value and then completes.
-* <code>Observable.Empty()</code>: Creates a sequence that completes without any values.
-* <code>Observable.Never()</code>: Creates a sequence that never completes and never produces any values or errors.
-* <code>Observable.Throw(Exception)</code>: Creates a sequence that produces one error.
-* <code>Observable.Range(min, max)</code>: Creates an sequence with all values from min to max in sequence.
-* <code>Observable.Timer(value, timeSpan)</code>: 
-* <code>Observable.Interval(timeSpan)</code>: Creates an Observable that 'ticks' an incrementing value at the specified interval.
+* `Observable.Return(T)`: Creates a sequence with a single value and then completes.
+* `Observable.Empty()`: Creates a sequence that completes without any values.
+* `Observable.Never()`: Creates a sequence that never completes and never produces any values or errors.
+* `Observable.Throw(Exception)`: Creates a sequence that produces one error.
+* `Observable.Range(min, max)`: Creates an sequence with all values from min to max in sequence.
+* `Observable.Timer(value, timeSpan)`: 
+* `Observable.Interval(timeSpan)`: Creates an Observable that 'ticks' an incrementing value at the specified interval.
 
 There are also several factory methods that will convert familiar .Net constructs into Rx Observables:
-* <code>Observable.Start(func or action)</code>: This is kind of a lazy version of <code>Observable.Return(value)</code> whereas this version executes the action or function lazily, when the Observable is first subscribed to.
-* <code>Observable.FromEventPattern(...)</code>: This creates an Observable that is a .Net event handler.  This can be used to create an Observable stream of UI events, for example.  There are several overloaded versions of this to handle different styles of events.
-* <code>Observable.FromTask(task)</code>
-* <code>Task&lt;T&gt;.ToObservable()</code>: This extension method creates an Observable that will contain a single value of the result of the task and then terminate.
+* `Observable.Start(func or action)`: This is kind of a lazy version of `Observable.Return(value)` whereas this version executes the action or function lazily, when the Observable is first subscribed to.
+* `Observable.FromEventPattern(...)`: This creates an Observable that is a .Net event handler.  This can be used to create an Observable stream of UI events, for example.  There are several overloaded versions of this to handle different styles of events.
+* `Observable.FromTask(task)`
+* `Task<T>.ToObservable()`: This extension method creates an Observable that will contain a single value of the result of the task and then terminate.
+
+![](/images/observableConversions.png)
 
 #### Subscribing to Observables
 
@@ -100,7 +152,7 @@ Talk about the implicit contract of how a stream is terminated (onComplete or on
 
 One of the simplest things you can do with LINQ is to filter out the elements you don't want from a collection.  This is done with the Where function:
 
-{% highlight c# %}
+{%highlight csharp%}
 IObservable<long> xs = Observable.Interval(TimeSpan.FromSeconds(1));
 IObservable<long> odds = xs.Where(x => x%2 == 1);
 IObservable<long> evens = xs.Where(x => x%2 == 0);
@@ -110,7 +162,7 @@ Note how creating both the odds and evens collections demonstrates that it is po
 
 Sometimes it is useful to transform the values in a collection from one value to another, including changing the type.  With LINQ this is done with the (poorly named in my opinion) Select() function.  The following example produces an Observable sequence that produces an output every second of type string instead of long:
 
-{% highlight c# %}
+{%highlight csharp%}
 IObservable<long> xs = Observable.Interval(TimeSpan.FromSeconds(1));
 IObservable<string> transformed = xs.Select(x => String.Format("It has been {0} seconds", x));
 {% endhighlight %}
@@ -119,28 +171,28 @@ IObservable<string> transformed = xs.Select(x => String.Format("It has been {0} 
 
 Time is not something that is generally a concern when iterating over a synchronous collection, however it can become a significant concern when dealing with asynchronous Observables that make produce outputs at any rate.  To handle these scenarios, Rx added several new LINQ operators that deal specifically with time.
 
-The <code>Buffer</code> operator collects all of the values received for awhile and then publishes all of those values as a (synchronous) IList of those values.  Buffer comes in two flavors, one that buffers for a specific amount of time, and one that buffers until a specific number of values are in the buffer.  There is also a Buffer that works on both time and count that will produce a value when either one of those limits have been reached.  In the following example the bufferedByTime and bufferedByCount sequences are equivalent.
+The `Buffer` operator collects all of the values received for awhile and then publishes all of those values as a (synchronous) IList of those values.  Buffer comes in two flavors, one that buffers for a specific amount of time, and one that buffers until a specific number of values are in the buffer.  There is also a Buffer that works on both time and count that will produce a value when either one of those limits have been reached.  In the following example the bufferedByTime and bufferedByCount sequences are equivalent.
 
-{% highlight c# %}
+{%highlight csharp%}
 IObservable<long> xs = Observable.Interval(TimeSpan.FromMilliseconds(250));
 IObservable<IList<long>> bufferedByTime = xs.BufferWithTime(TimeSpan.FromSeconds(1));
 IObservable<IList<long>> bufferedByCount = xs.BufferWithCount(4);
 {% endhighlight %}  
 
-Sometimes when the Observable is pushing values too quickly you don't actually need every value that it produces.  That is where the <code>Sample</code> and <code>Throttle</code> operators come in among others.
+Sometimes when the Observable is pushing values too quickly you don't actually need every value that it produces.  That is where the `Sample` and `Throttle` operators come in among others.
 
-The <code>Sample</code> operator simply returns the latest value of the sequence for every specified *TimeSpan*.  For example, the samples sequence in the code below will produce a value every second with the values 9, 19, 29, etc.
+The `Sample` operator simply returns the latest value of the sequence for every specified *TimeSpan*.  For example, the samples sequence in the code below will produce a value every second with the values 9, 19, 29, etc.
 
 {% highlight c# %}
 IObservable<long> xs = Observable.Interval(TimeSpan.FromMilliseconds(100));
 IObservable<long> samples = xs.Sample(TimeSpan.FromSeconds(1));
 {% endhighlight %}
 
-The <code>Throttle</code> operator is similar but it waits until the source stream has not produced a value for a specific amount of time, and then it emits the latest value from the source.  This can be especially useful if you know that the source stream produces values in bursts and you don't care about the intermediate values.  A concrete example of this is listening to keyboard events.  You don't want to do anything while the user is in the middle of typing, but rather you should wait until they have been idle for a few hundred milliseconds, and then do your work.
+The `Throttle` operator is similar but it waits until the source stream has not produced a value for a specific amount of time, and then it emits the latest value from the source.  This can be especially useful if you know that the source stream produces values in bursts and you don't care about the intermediate values.  A concrete example of this is listening to keyboard events.  You don't want to do anything while the user is in the middle of typing, but rather you should wait until they have been idle for a few hundred milliseconds, and then do your work.
 
-Sometimes you could have multiple possible sources for the same information, but you only want to use the one that is currently performing the best.  Suppose you want get a real-time stream of stock prices for a particular stock.  There are many different web services for that sort of data, but one one day source A might perform better but on another day source B might perform better.  The <code>Amb</code> (short for ambiguous) operation can help here.  It takes in two  or more observable sequences and only reports values for the one that produced a value first.  Using this operator, we can create observables against BOTH sources, combine them with <code>Amb</code> and the first one to return a value is used to produce the entire stream.  Here is what that would look like in code:
+Sometimes you could have multiple possible sources for the same information, but you only want to use the one that is currently performing the best.  Suppose you want get a real-time stream of stock prices for a particular stock.  There are many different web services for that sort of data, but one one day source A might perform better but on another day source B might perform better.  The `Amb` (short for ambiguous) operation can help here.  It takes in two  or more observable sequences and only reports values for the one that produced a value first.  Using this operator, we can create observables against BOTH sources, combine them with `Amb` and the first one to return a value is used to produce the entire stream.  Here is what that would look like in code:
 
-{% highlight c# %}
+{%highlight csharp%}
 IObservable<StockTicker> tickerA = // (Create an observable from source A);
 IObservable<StockTicker> tickerB = // (Create an observable from source B);
 
@@ -158,9 +210,9 @@ blah
 
 blah
 
-  All we've done is create some push collections that will generate values in perpetuity.  In order to work with the values pushed out of the collections, we need to <code>Subscribe</code> to them:
+  All we've done is create some push collections that will generate values in perpetuity.  In order to work with the values pushed out of the collections, we need to `Subscribe` to them:
 
-{% highlight c# %}
+{%highlight csharp%}
 val xs = Observable.Interval(TimeSpan.FromSeconds(1));
 using(val subscription = cs.Subscribe(Console.WriteLine))
 {
