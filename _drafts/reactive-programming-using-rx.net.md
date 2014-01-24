@@ -16,7 +16,7 @@ For the sake of an admittedly contrived example, suppose you are working on some
 
 >Display a text box for a user to type in a product name.  Once they've typed in a few characters, populate a side bar displaying the full name of every product that starts with the typed in letters.  Then for each product returned look up the top 10 customers for each. The product names must be displayed as soon as they are available, and the customer data must be filled in as it arrives.  The application must remain usable while the data is being populated.
 
-To make things interesting, we're going to presume that the list of products and top 10 customer list all come from their own distinct services.  To add an additional wrinkle, there are actually 3 different product catalogs that we must check, and there is no existing service to provide an aggregate search across all 3.
+To make things interesting, we're going to presume that distinct synchronous services already exist to lookup the list of products and customer list .  To add an additional wrinkle, there are actually 3 different product catalogs that we must check, and there is no existing service to provide an aggregate search across all 3.
 
 Most developers will read that and immediately start thinking of asynchronous callbacks.  They are probably thinking this is do-able, but it is going to be ugly.  The power of the Rx extensions is that it allows us to turn this into a very elegant solution.
 
@@ -86,20 +86,26 @@ Right about now you may be rather unimpressed, after all the .Net runtime alread
 It is generally a good strategy to break the problem down into individual components, and this is no exception.  To do that, we'll write functions to retrieve each piece of data:
 
 {% highlight c# %}
-public IList<Product> ProductsStartingWith(string startsWith, int catalogId)
+public IObservable<Product> ProductsStartingWith(string startsWith, int catalogId)
 {
-  // Code to synchronously lookup Products from the specified catalog.
+  IEnumerable<Product> productList = // Look up products synchronously.
+  return productList.AsObservable();
 }
 
-public IObservable<Thing> asdfsafd(Product p) {
-  return Observable.Create(observer =>
+public IObservable<Customer> CustomersForProduct(Product p) {
+  return Observable.Create(IObserver observer =>
     try
     {
-	  observer.OnNext(/* Lookup thing synchronously.  This may fail */);
+      IEnumerable<Customer> customers = // Look up customers synchronously.
+      foreach(var c in customers)
+      {
+        observer.OnNext(c);
+      }
+      return Disposable.Empty;
     }
     catch(Exception e)
     {
-      observer.OnException(e);
+      observer.OnError(e);
     }
     finally
     {
@@ -109,8 +115,17 @@ public IObservable<Thing> asdfsafd(Product p) {
 }
 {% endhighlight %}
 
-blah blah blah
+OK, so lets look at what we have so far.  Both of these methods return an IObservable representing a collection of data.  But `ProductsStartingWith` uses the `ToObservable` extension method while `CustomersForProduct` one uses the `Observable.Create` factory method.  Lets compare these:
 
+The `ProductsStartingWith` blocks while it looks up the product list, and the caller does not get a handle to the resulting IObservable until it has been fully populated.  It is also worth noting that an exception will be thrown out of this method if the catalog lookup failed for some reason.  This clearly violates the resilience principle.  So maybe we should have written this one differently.  Lets look at the other method.
+
+The `CustomersForProduct` method makes use of the `Observable.Create` factory method for creating observable streams.  This method takes in an Action or Func that could execute on a separate thread.  The caller will be given the IObservable immediately, and the catalog lookup code is not execute until that IObservable has it's `Subscribe` method called.  The IObserver that is passed into the `Subscribe` method becomes the parameter to the Func in the `Create` method.
+
+So we can see that this method is asynchronous, so far so good for adhering to the reactive principles.  But what happens if the lookup fails?  Well it is pretty easy to see that the OnError method of the IObservable will be called, and given the exception that caused the error.  One really cool side-effect of this is what happens if the IEnumerable that contains the Customers was created using `yield return` continuations.  In that case, the IObserver could still have its `OnNext` method called for *some* of the Customers prior to having its `OnError` method called when it hits a snag.  This is an excellent example the resiliency principle.
+
+After looking at these two methods, the second one is clearly the better choice for a reactive application.
+
+{% comment %}
 ---
 
 #OLD STUFF
@@ -128,6 +143,7 @@ blah blah blah
 #### Creating Observables
 
 The Rx library is loaded with many different ways to create Observable instances.  Several of them are not that useful for production code, but are great for testing or for examples.  Some of these are:
+
 * `Observable.Return(T)`: Creates a sequence with a single value and then completes.
 * `Observable.Empty()`: Creates a sequence that completes without any values.
 * `Observable.Never()`: Creates a sequence that never completes and never produces any values or errors.
@@ -137,6 +153,7 @@ The Rx library is loaded with many different ways to create Observable instances
 * `Observable.Interval(timeSpan)`: Creates an Observable that 'ticks' an incrementing value at the specified interval.
 
 There are also several factory methods that will convert familiar .Net constructs into Rx Observables:
+
 * `Observable.Start(func or action)`: This is kind of a lazy version of `Observable.Return(value)` whereas this version executes the action or function lazily, when the Observable is first subscribed to.
 * `Observable.FromEventPattern(...)`: This creates an Observable that is a .Net event handler.  This can be used to create an Observable stream of UI events, for example.  There are several overloaded versions of this to handle different styles of events.
 * `Observable.FromTask(task)`
@@ -226,3 +243,4 @@ Code executed here will NOT have values printed every second, because the subscr
 
 Creating the subscription as part of a using block is a convenient way to ensure proper disposal of a subscription, but of course subscriptions can also be passed around to other parts of your application.
 
+{% endcomment %}
