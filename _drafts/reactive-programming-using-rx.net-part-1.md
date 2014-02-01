@@ -8,6 +8,10 @@ tagline: Part 1
 ---
 {% include JB/setup %}
 
+This blog series is originally being done for my company's blog.  You can find the original post [here](http://www.centare.com/reactive-programming-using-rx-net-part-1).
+
+---
+
 In my [previous reactive programming post]({% post_url 2014-01-20-intro-to-reactive-programming %}) I talked about the high level principles of reactive programming.  In this and future posts I want to delve deeper into the topic and explore how to actually write reactive applications on different platforms.  The platform of choice for this week is .Net using the [Rx extensions](https://rx.codeplex.com/) from Microsoft Open Technologies.
 
 <!--excerpt-->
@@ -102,15 +106,12 @@ public IObservable<Customer> CustomersForProduct(Product p) {
       {
         observer.OnNext(c);
       }
+      observer.OnComplete();
       return Disposable.Empty;
     }
     catch(Exception e)
     {
       observer.OnError(e);
-    }
-    finally
-    {
-      observer.OnComplete();
     }
   );
 }
@@ -122,7 +123,7 @@ The `ProductsStartingWith` blocks while it looks up the product list, and the ca
 
 The `CustomersForProduct` method makes use of the `Observable.Create` factory method for creating observable streams.  This method takes in an Action or Func that could execute on a separate thread.  The caller will be given the IObservable immediately, and the catalog lookup code is not execute until that IObservable has it's `Subscribe` method called.  The IObserver that is passed into the `Subscribe` method becomes the parameter to the Func in the `Create` method.
 
-So we can see that this method is asynchronous, so far so good for adhering to the reactive principles.  But what happens if the lookup fails?  Well it is pretty easy to see that the OnError method of the IObservable will be called, and given the exception that caused the error.  One really cool side-effect of this is what happens if the IEnumerable that contains the Customers was created using `yield return` continuations.  In that case, the IObserver could still have its `OnNext` method called for *some* of the Customers prior to having its `OnError` method called when it hits a snag.  This is an excellent example the *resiliency principle*.  After looking at these two methods, the second one is clearly the better choice for a reactive application.  We'll presume that we rewrote the first method use the `Observable.Create` factory method as well.
+So we can see that this method is asynchronous, so far so good for adhering to the reactive principles.  But what happens if the lookup fails?  Well it is pretty easy to see that the `OnError` method of the IObservable will be called, and given the exception that caused the error.  One really cool side-effect of this is what happens if the IEnumerable that contains the Customers was created using `yield return` continuations.  In that case, the IObserver could still have its `OnNext` method called for *some* of the Customers prior to having its `OnError` method called when it hits a snag.  This is an excellent example the *resiliency principle*.  After looking at these two methods, the second one is clearly the better choice for a reactive application.  We'll presume that we rewrote the first method use the `Observable.Create` factory method as well.
 
 In my next post I will talk about how to consume these IObservable collections in a reactive and elegant fashion so that we can realize the above requirements.
 
