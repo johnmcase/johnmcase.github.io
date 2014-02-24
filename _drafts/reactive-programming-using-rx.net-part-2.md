@@ -47,12 +47,56 @@ public IObservable<Product> ProductsStartingWith(string startsWith)
 
 Great, so now we have built an Observable sequence of all products across all catalogs in a non-blocking asynchronous way.  Now we have to tackle the requirement of looking up the top 10 customers for each product.  We're going to tackle this requirement with a familiar tool: LINQ.  Rx has re-implemented all of the standard LINQ operatiors against IObservable, and has done so in an asynchronous non-blocking fashion whenever possible.  What we need to do is take the Observable sequence of all Products that we just built, and project each element into a new Sequence of its top 10 customers.  The way to do this with LINQ is with the `Select` method.
 
-Remember from the last post that we already have the `CustomersForProduct` method to look up all of the customers in sorted order.  So this somewhat complicated requirement actually boils down to a single statement:
+Remember from the last post that we already have the `CustomersForProduct` method to look up all of the customers in sorted order.  We also need a way to match the customer list back to the product it corresponds to, so we'll actually create an IObservable of a new annonymous object type.  Even with that wrinkle, this somewhat complicated requirement actually boils down to a single statement:
 
 %{ highlight csharp %}
-public IObservable<IObservable<Customer>>(IObservable<Product> products)
+public IObservable<object> ProductsWithTopTenCustomers(IObservable products)
 {
-  return products.Select(p => CustomersForProduct(p).Take(10));
+  return products.Select(p => 
+    new {
+      Product = p,
+      Customers = CustomersForProduct(p).Take(10)
+    });
+} 
+{% endhighlight %}
+
+**blah blah blah** about how this is non-blocking and execution will create handles to these sequences that then start having data added to them as it becomes available.
+
+All we have to do at this point is to consume this data and display it on the UI.  The UI code itself is out of scope for this post, but lets just assume we have the following methods available to us:
+
+{% highlight csharp %}
+public void DisplayProduct(Product p)
+{
+  // code to add the product to the list of products on the UI
 }
+public void DisplayTopTenUsers(Product p, IEnumerable<Customers>)
+{
+  // code to display the list of customers with the appropriate product
+}
+public void DisplayErrorMessage(Exception ex)
+{
+  // code to display a friendly error message (and potentially log the error too)
+}
+{% endhighlight %}
+
+We're so close to putting everything together here.  Any rich UI developer will tell you that the UI helper methods above cannot be executed on just any old thread, they *have* to be executed on the UI Dispatcher thread.  Up until now we've let Rx execute its asynchronous code on any thread, but now we have to constrain it and force it to use the UI Dispatch thread for certain operations.  Fortunately, this is easily done with the `ObserveOn` method and the concept of Schedulers.
+
+A scheduler is simply an Object that tells Rx how it can execute asynchronously.  Rx comes with some pre-built schedulers out of the box, and sure enough there is one that will force execution onto the UI Dispatcher thread.  
+
+After taking the above into consideration, the final piece of code to stitch everything together is as follows: 
+
+{% highlight csharp %}
+var products = ProductsStartingWith(<<user input>>);
+var productsWithCustomers = ProductsWithtopTenCustomers(products));
+
+products.ObserveOn(SchedulerDispatcher).Subscribe(
+  p => DisplayProduct(p),
+  ex => DisplayErrorMessage(ex)
+);
+
+productsWithcustomers.ObserveOn(SchedulerDispatcher).Subscribe(
+  pwc => DisplayTopTenUsers(pwc.Product, pwc.Customers.ToEnumerable()),
+  ex => DisplayErrorMessage(ex)
+)
 {% endhighlight %}
 
