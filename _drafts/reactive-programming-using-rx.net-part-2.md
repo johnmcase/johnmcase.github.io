@@ -45,4 +45,14 @@ public IObservable<Product> ProductsStartingWith(string startsWith)
 }
 {% endhighlight %}
 
-Great, so now we have built an Observable sequence of all products across all catalogs in a non-blocking asynchronous way.  Now we have to tackle the requirement of looking up the top 10 customers for each product.  We're going to tackle this requirement with a familiar tool: LINQ.  Rx has re-implemented all of the standard LINQ operatiors against IObservable, and has done so in an asynchronous non-blocking fashion whenever possible.  
+Great, so now we have built an Observable sequence of all products across all catalogs in a non-blocking asynchronous way.  Now we have to tackle the requirement of looking up the top 10 customers for each product.  We're going to tackle this requirement with a familiar tool: LINQ.  Rx has re-implemented all of the standard LINQ operatiors against IObservable, and has done so in an asynchronous non-blocking fashion whenever possible.  What we need to do is take the Observable sequence of all Products that we just built, and project each element into a new Sequence of its top 10 customers.  The way to do this with LINQ is with the `Select` method.
+
+Remember from the last post that we already have the `CustomersForProduct` method to look up all of the customers in sorted order.  So this somewhat complicated requirement actually boils down to a single statement:
+
+%{ highlight csharp %}
+public IObservable<IObservable<Customer>>(IObservable<Product> products)
+{
+  return products.Select(p => CustomersForProduct(p).Take(10));
+}
+{% endhighlight %}
+
