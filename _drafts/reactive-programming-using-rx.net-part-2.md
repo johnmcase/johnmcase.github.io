@@ -47,9 +47,9 @@ public IObservable<Product> ProductsStartingWith(string startsWith)
 
 Great, so now we have built an Observable sequence of all products across all catalogs in a non-blocking asynchronous way.  Now we have to tackle the requirement of looking up the top 10 customers for each product.  We're going to tackle this requirement with a familiar tool: LINQ.  Rx has re-implemented all of the standard LINQ operatiors against IObservable, and has done so in an asynchronous non-blocking fashion whenever possible.  What we need to do is take the Observable sequence of all Products that we just built, and project each element into a new Sequence of its top 10 customers.  The way to do this with LINQ is with the `Select` method.
 
-Remember from the last post that we already have the `CustomersForProduct` method to look up all of the customers in sorted order.  We also need a way to match the customer list back to the product it corresponds to, so we'll actually create an IObservable of a new annonymous object type.  Even with that wrinkle, this somewhat complicated requirement actually boils down to a single statement:
+Remember from the last post that we already have the `CustomersForProduct` method to look up all of the customers in sorted order.  We also need a way to match the customer list back to the product it corresponds to, so we'll actually create an IObservable of a new annonymous object type that wraps the product and it's customer list together.  Even with that wrinkle, this somewhat complicated requirement actually boils down to a single statement:
 
-%{ highlight csharp %}
+{% highlight csharp %}
 public IObservable<object> ProductsWithTopTenCustomers(IObservable products)
 {
   return products.Select(p => 
@@ -60,7 +60,7 @@ public IObservable<object> ProductsWithTopTenCustomers(IObservable products)
 } 
 {% endhighlight %}
 
-**blah blah blah** about how this is non-blocking and execution will create handles to these sequences that then start having data added to them as it becomes available.
+Even this is just standard LINQ syntax, this is still non-blocking and asynchronous.  The lambda in the `Select` statement is executed only when data becomes available.  So the caller is given a handle to the resulting IObservable immediately and it will start to produce values as soon as values are available on the input IObservable.
 
 All we have to do at this point is to consume this data and display it on the UI.  The UI code itself is out of scope for this post, but lets just assume we have the following methods available to us:
 
@@ -99,4 +99,8 @@ productsWithcustomers.ObserveOn(SchedulerDispatcher).Subscribe(
   ex => DisplayErrorMessage(ex)
 )
 {% endhighlight %}
+
+That's it.  Our UI will start to populate product information as soon as it becomes available, and it will also fill in the top ten customer list at a later time, but as soon as it is available as well.  Also the UI will still be responsive to user input while all of the data fetching is happening in the background.
+
+This was obviously a rather contrived and not very realistic example, but I hope that served as a good example of Rx and demonstrated its ability to handle somewhat complicated asynchronous scenarios with code that is easy to write and easy to understand.  For a much deeper dive on Rx, I highly recommend Lee Campbell's [Intro to Rx](http://www.introtorx.com/) online book, the [Channel 9 Rx tag](http://channel9.msdn.com/tags/Rx/), and also the Rx home page on [CodePlex](http://rx.codeplex.com/).
 
