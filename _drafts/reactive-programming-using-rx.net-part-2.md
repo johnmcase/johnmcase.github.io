@@ -104,3 +104,4 @@ That's it.  Our UI will start to populate product information as soon as it beco
 
 This was obviously a rather contrived and not very realistic example, but I hope that served as a good example of Rx and demonstrated its ability to handle somewhat complicated asynchronous scenarios with code that is easy to write and easy to understand.  For a much deeper dive on Rx, I highly recommend Lee Campbell's [Intro to Rx](http://www.introtorx.com/) online book, the [Channel 9 Rx tag](http://channel9.msdn.com/tags/Rx/), and also the Rx home page on [CodePlex](http://rx.codeplex.com/).
 
+In my next blog post, I intend to leave the world of .Net and look at reactive programming on the JVM.
