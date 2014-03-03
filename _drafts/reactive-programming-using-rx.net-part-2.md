@@ -8,7 +8,7 @@ tagline: Part 2
 ---
 {% include JB/setup %}
 
-in this third post in my [reactive programming]({% post_url 2014-01-20-intro-to-reactive-programming %}) blog series I want to continue where we left off in the [second post]({% post_url 2014-02-03-reactive-programming-using-rx.net-part-1 %}) in discussing the Rx .Net framework.  Last time I talked about how to use the `Observable.Create` factory method to construct Observable sequences in accordance with the [reactive principles](http://reactivemanifesto.org).  Know that this is not the only way to construct an Observable, but it is the most general way.  The Rx library ships with many convenience factory methods that allow you to easily construct Observable sequences from delegates, async tasks, and from events.
+In this third post in my [reactive programming]({% post_url 2014-01-20-intro-to-reactive-programming %}) blog series I want to continue where we left off in the [second post]({% post_url 2014-02-03-reactive-programming-using-rx.net-part-1 %}) in discussing the Rx .Net framework.  Last time I talked about how to use the `Observable.Create` factory method to construct Observable sequences in accordance with the [reactive principles](http://reactivemanifesto.org).  Know that this is not the only way to construct an Observable, but it is the most general way.  The Rx library ships with many convenience factory methods that allow you to easily construct Observable sequences from delegates, async tasks, and from events.
 
 <!--excerpt-->
 
@@ -79,7 +79,7 @@ public void DisplayErrorMessage(Exception ex)
 }
 {% endhighlight %}
 
-We're so close to putting everything together here.  Any rich UI developer will tell you that the UI helper methods above cannot be executed on just any old thread, they *have* to be executed on the UI Dispatcher thread.  Up until now we've let Rx execute its asynchronous code on any thread, but now we have to constrain it and force it to use the UI Dispatch thread for certain operations.  Fortunately, this is easily done with the `ObserveOn` method and the concept of Schedulers.
+We're so close to putting everything together here.  Any rich UI developer will tell you that the UI helper methods above cannot be executed on just any old thread, they *must* be executed on the UI Dispatcher thread.  Up until now we've let Rx execute its asynchronous code on any thread, but now we have to constrain it and force it to use the UI Dispatch thread for certain operations.  Fortunately, this is easily done with the `ObserveOn` method and the concept of Schedulers.
 
 A scheduler is simply an Object that tells Rx how it can execute asynchronously.  Rx comes with some pre-built schedulers out of the box, and sure enough there is one that will force execution onto the UI Dispatcher thread.  
 
