@@ -8,6 +8,10 @@ tagline: Part 2
 ---
 {% include JB/setup %}
 
+This blog series is originally being done for my company's blog.  You can find the original post [here](http://www.centare.com/reactive-programming-using-rx-net-part-2/).
+
+---
+
 In this third post in my [reactive programming]({% post_url 2014-01-20-intro-to-reactive-programming %}) blog series I want to continue where we left off in the [second post]({% post_url 2014-02-03-reactive-programming-using-rx.net-part-1 %}) in discussing the Rx .Net framework.  Last time I talked about how to use the `Observable.Create` factory method to construct Observable sequences in accordance with the [reactive principles](http://reactivemanifesto.org).  Know that this is not the only way to construct an Observable, but it is the most general way.  The Rx library ships with many convenience factory methods that allow you to easily construct Observable sequences from delegates, async tasks, and from events.
 
 <!--excerpt-->
